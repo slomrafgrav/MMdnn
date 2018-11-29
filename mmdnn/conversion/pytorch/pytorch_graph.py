@@ -72,6 +72,7 @@ class PytorchGraph(Graph):
         torch._C._jit_pass_lint(graph)
         if not export_raw_ir:
             graph = torch._C._jit_pass_onnx(graph, aten)
+            # graph = torch._C._jit_pass_onnx(graph, torch._C._onnx.OperatorExportTypes.ONNX)
             torch._C._jit_pass_lint(graph)
             torch._C._jit_pass_onnx_peephole(graph)
             torch._C._jit_pass_lint(graph)

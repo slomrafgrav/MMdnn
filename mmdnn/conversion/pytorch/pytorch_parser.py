@@ -1,7 +1,7 @@
-#----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------
 #  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License. See License.txt in the project root for license information.
-#----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------
 
 import os
 import numpy as np
@@ -9,45 +9,49 @@ import mmdnn.conversion.common.IR.graph_pb2 as graph_pb2
 from mmdnn.conversion.common.IR.graph_pb2 import NodeDef, GraphDef, DataType
 from mmdnn.conversion.common.utils import *
 from mmdnn.conversion.common.DataStructure.parser import Parser
+from mmdnn.conversion.pytorch.model_utils import creator
 from mmdnn.conversion.pytorch.pytorch_graph import PytorchGraph
 import torch
 import torchvision
 
+
+# from mmdnn.conversion.pytorch.model_utils.cadene_models import pretrainedmodels as cadene_models
+
+
 class PytorchParser(Parser):
-
     layer_map = {
-    'onnx::Conv': 'Conv',
-    'onnx::Flatten': 'Flatten',
-    'onnx::Gemm': 'FullyConnected',
-    'onnx::MaxPool': 'Maxpool',
-    'onnx::AveragePool': 'Avgpool',
-    'onnx::Dropout': 'Dropout',
-    'onnx::BatchNormalization': 'BatchNormalization',
-    'onnx::Add': 'Add',
-    'onnx::Concat': 'Concat',
-    'onnx::Relu': 'Relu',
-    'onnx::Tanh': 'Tanh',
+        'onnx::Conv': 'Conv',
+        'onnx::Flatten': 'Flatten',
+        'onnx::Gemm': 'FullyConnected',
+        'onnx::MaxPool': 'Maxpool',
+        'onnx::AveragePool': 'Avgpool',
+        'onnx::Dropout': 'Dropout',
+        'onnx::BatchNormalization': 'BatchNormalization',
+        'onnx::Add': 'Add',
+        'onnx::Concat': 'Concat',
+        'onnx::Relu': 'Relu',
+        'onnx::Tanh': 'Tanh',
+        'onnx::Sigmoid': 'Sigmoid',
+        'onnx::Mul': 'Mul'
 
-
-    # TODO
-    # 'max_pool2d': convert_maxpool,
-    # 'onnx::Mul': convert_elementwise_mul,
-    # 'onnx::Sub': convert_elementwise_sub,
-    # 'onnx::ConvTranspose': convert_convtranspose,
-    # 'onnx::LeakyRelu': convert_lrelu,
-    # 'onnx::Sigmoid': convert_sigmoid,
-    # 'onnx::Softmax': convert_softmax,
-    # 'onnx::Selu': convert_selu,
-    # 'onnx::Transpose': convert_transpose,
-    # 'onnx::Reshape': convert_reshape,
-    # 'onnx::MatMul': convert_matmul,
-    # 'onnx::Gather': convert_gather,
-    # 'onnx::ReduceSum': convert_reduce_sum,
-    # 'onnx::Constant': convert_constant,
-    # 'onnx::Upsample': convert_upsample,
-    # 'onnx::Pad': convert_padding,
-}
-
+        # TODO
+        # 'max_pool2d': convert_maxpool,
+        # 'onnx::Mul': convert_elementwise_mul,
+        # 'onnx::Sub': convert_elementwise_sub,
+        # 'onnx::ConvTranspose': convert_convtranspose,
+        # 'onnx::LeakyRelu': convert_lrelu,
+        # 'onnx::Sigmoid': convert_sigmoid,
+        # 'onnx::Softmax': convert_softmax,
+        # 'onnx::Selu': convert_selu,
+        # 'onnx::Transpose': convert_transpose,
+        # 'onnx::Reshape': convert_reshape,
+        # 'onnx::MatMul': convert_matmul,
+        # 'onnx::Gather': convert_gather,
+        # 'onnx::ReduceSum': convert_reduce_sum,
+        # 'onnx::Constant': convert_constant,
+        # 'onnx::Upsample': convert_upsample,
+        # 'onnx::Pad': convert_padding,
+    }
 
     ############
     # property #
@@ -56,7 +60,6 @@ class PytorchParser(Parser):
     @property
     def src_graph(self):
         return self.pytorch_graph
-
 
     ####################
     # Public Functions #
@@ -74,6 +77,8 @@ class PytorchParser(Parser):
             model = torch.load(model_file_name)
         except:
             model = torch.load(model_file_name, map_location='cpu')
+        # model = creator.create_from_file(model_file_name)
+        # print(t)
 
         self.weight_loaded = True
 
@@ -84,14 +89,12 @@ class PytorchParser(Parser):
         self.state_dict = self.pytorch_graph.state_dict
         self.shape_dict = self.pytorch_graph.shape_dict
 
-
     def gen_IR(self):
 
         for layer in self.src_graph.topological_sort:
             current_node = self.src_graph.get_node(layer)
             onnx_node_type = current_node.type
             node_type = PytorchParser.layer_map[onnx_node_type]
-
 
             if hasattr(self, "rename_" + node_type):
                 func = getattr(self, "rename_" + node_type)
@@ -102,17 +105,13 @@ class PytorchParser(Parser):
 
         self.gen_Input()
 
-
-
     def _set_output_shape(self, source_node, IR_node):
 
         shape = graph_pb2.TensorShape()
 
-
         layer_name = source_node.name
 
         shape_pytorch = self.shape_dict[layer_name]
-
 
         new_dim = shape.dim.add()
 
@@ -139,15 +138,14 @@ class PytorchParser(Parser):
             dim = shape_pytorch[1]
             new_dim.size = dim if dim else -1
 
-
         IR_node.attr["_output_shapes"].list.shape.extend([shape])
 
     ##########
     # Layers #
     ##########
     def rename_UNKNOWN(self, source_node):
-        print (source_node.layer)
-        print (source_node.layer.data.size())
+        print(source_node.layer)
+        print(source_node.layer.data.size())
         assert False
         print("PyTorch parser has not supported operator [%s] with name [%s]."
               % (source_node.type, source_node.name))
@@ -197,9 +195,7 @@ class PytorchParser(Parser):
             dim = shape_pytorch[1]
             new_dim.size = dim if dim else -1
 
-
         IR_node.attr["_output_shapes"].list.shape.extend([shape])
-
 
     def rename_Conv(self, source_node):
 
@@ -215,7 +211,7 @@ class PytorchParser(Parser):
         if len(attr['pads']) == 4:
             kwargs['pads'] = [0] + attr['pads'][0:2] + [0, 0] + attr['pads'][2:] + [0]
         elif len(attr['pads']) == 2:
-            kwargs['pads'] = ( [0] + attr['pads'][0:2] + [0] ) *2
+            kwargs['pads'] = ([0] + attr['pads'][0:2] + [0]) * 2
 
         if 'strides' not in attr:
             kwargs['strides'] = [1] + [1, 1] + [1]
@@ -223,8 +219,6 @@ class PytorchParser(Parser):
             kwargs['strides'] = [1] + attr['strides'] + [1]
 
         kwargs['group'] = attr['group']
-
-
 
         bias_name = '{0}.bias'.format(source_node.weights_name)
         weights_name = '{0}.weight'.format(source_node.weights_name)
@@ -234,13 +228,11 @@ class PytorchParser(Parser):
         weight = weight.numpy()
         dim = weight.ndim - 2
 
-
         IR_node = self._convert_identity_operation(source_node, new_op="Conv")
         weight = np.transpose(weight, list(range(2, dim + 2)) + [1, 0])
 
         self.set_weight(source_node.name, 'weights', weight)
         kwargs['kernel_shape'] = list(weight.shape)
-
 
         # handle bias
         if bias_name in self.state_dict:
@@ -250,9 +242,7 @@ class PytorchParser(Parser):
         else:
             kwargs['use_bias'] = False
 
-
         assign_IRnode_values(IR_node, kwargs)
-
 
     def rename_BatchNormalization(self, source_node):
         # TODO
@@ -260,18 +250,14 @@ class PytorchParser(Parser):
 
         IR_node = self._convert_identity_operation(source_node, new_op="BatchNorm")
 
-
         attr = source_node.attrs
         # epsilon
         IR_node.attr['epsilon'].f = attr['epsilon']
-
 
         bias_name = '{0}.bias'.format(source_node.weights_name)
         weights_name = '{0}.weight'.format(source_node.weights_name)
         mean_name = '{0}.running_mean'.format(source_node.weights_name)
         var_name = '{0}.running_var'.format(source_node.weights_name)
-
-
 
         if bias_name in self.state_dict:
             beta = self.state_dict[bias_name].numpy()
@@ -287,8 +273,6 @@ class PytorchParser(Parser):
 
         mean = self.state_dict[mean_name].numpy()
         variance = self.state_dict[var_name].numpy()
-
-
 
         if IR_node.attr['scale'].b:
             self.set_weight(source_node.name, "scale", gamma)
@@ -307,6 +291,12 @@ class PytorchParser(Parser):
 
     def rename_Tanh(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op="Tanh")
+
+    def rename_Sigmoid(self, source_node):
+        IR_node = self._convert_identity_operation(source_node, new_op="Sigmoid")
+
+    def rename_Mul(self, source_node):
+        IR_node = self._convert_identity_operation(source_node, new_op="Mul")
 
     def rename_Maxpool(self, source_node):
         attr = source_node.attrs
@@ -349,7 +339,6 @@ class PytorchParser(Parser):
         bias_name = '{0}.bias'.format(source_node.weights_name)
         weights_name = '{0}.weight'.format(source_node.weights_name)
 
-
         W = self.state_dict[weights_name].numpy().transpose()
         input_channels, output_channels = W.shape
 
@@ -366,23 +355,22 @@ class PytorchParser(Parser):
                 dim = len(channel_first_list) + 1
                 weight = W.reshape(channel_first_list + [original_shape[1]])
                 assert dim > 2
-                weight = weight.transpose(list(range(1, dim-1)) + [0, dim-1])
+                weight = weight.transpose(list(range(1, dim - 1)) + [0, dim - 1])
                 W = weight.reshape(original_shape)
 
         # weights
-        self.set_weight(source_node.name, 'weights', W )
+        self.set_weight(source_node.name, 'weights', W)
 
         # use_bias
         if bias_name in self.state_dict:
             IR_node.attr['use_bias'].b = True
             bias = self.state_dict[bias_name].numpy()
-            self.set_weight(source_node.name, 'bias', bias )
+            self.set_weight(source_node.name, 'bias', bias)
         else:
             IR_node.attr['use_bias'].b = False
 
         # units
         IR_node.attr['units'].i = output_channels
-
 
     def rename_Dropout(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op='Dropout')
@@ -395,19 +383,15 @@ class PytorchParser(Parser):
         if source_node.attrs['axis'] == 1:
             IR_node.attr['axis'].i = len(self.shape_dict[source_node.name]) - 1
 
-
     def rename_Add(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op='Add')
-
 
     def rename_MaxPool2d(self, source_node):
         self._convert_pooling(source_node)
 
-
     def rename_View(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op='Reshape')
-        assign_IRnode_values(IR_node, {'shape' : list(source_node.get_attr('new_sizes'))[1:]})
-
+        assign_IRnode_values(IR_node, {'shape': list(source_node.get_attr('new_sizes'))[1:]})
 
     def rename_Addmm(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op='FullyConnected')
@@ -429,19 +413,17 @@ class PytorchParser(Parser):
 
         print(IR_node)
 
-
     ####################
     # Helper Functions #
     ####################
 
     @staticmethod
-    def _copy_and_reop(source_node, IR_node, new_op = None):
+    def _copy_and_reop(source_node, IR_node, new_op=None):
         if new_op == None: new_op = source_node.type
         IR_node.name = source_node.name
         IR_node.op = new_op
 
-
-    def _convert_identity_operation(self, source_node, in_edge_count = None, new_op = None):
+    def _convert_identity_operation(self, source_node, in_edge_count=None, new_op=None):
         IR_node = self.IR_graph.node.add()
         PytorchParser._copy_and_reop(source_node, IR_node, new_op)
         self.convert_inedge(source_node, IR_node, 0, in_edge_count)

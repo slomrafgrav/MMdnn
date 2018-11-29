@@ -1,0 +1,3 @@
+[submodule "mmdnn/conversion/pytorch/model_utils"]
+	path = mmdnn/conversion/pytorch/model_utils
+	url = git@github.com:alphatechengine/model_utils.git
